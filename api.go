@@ -7,8 +7,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"tbajson"
 	"time"
+
+	"github.com/Chase-Arline/tba/tbajson"
 )
 
 //Client represents an abstracted HTTP Client to pull from TBA API
