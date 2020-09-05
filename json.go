@@ -1,5 +1,11 @@
 package tba
 
+import (
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+)
+
 //EventStatistics holds the OPR, DPR, and CCWM information for each team at an event
 type EventStatistics struct {
 	OPRS  map[string]float64
@@ -47,4 +53,12 @@ type PlayoffData struct {
 	playoff_average      int
 	Current_level_record BasicRecord
 	Record               BasicRecord
+}
+
+func bodyToJSON(h *http.Response, v interface{}) error {
+	b, err := ioutil.ReadAll(h.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, v)
 }

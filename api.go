@@ -1,15 +1,11 @@
 package tba
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
-
-	tb "github.com/Chase-Arline/tba/tbajson"
 )
 
 //Client represents an abstracted HTTP Client to pull from TBA API
@@ -80,13 +76,9 @@ func (c client) FetchEvent(location, city, name string, year int) (Event, error)
 		return Event{}, err
 	}
 	events := []Event{}
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
+
+	if err = bodyToJSON(response, events); err != nil {
 		return Event{}, err
-	}
-	err = json.Unmarshal(b, &events)
-	if err != nil {
-		fmt.Println(err)
 	}
 	var match Event
 	var highestMatch int
@@ -115,24 +107,29 @@ func (c client) FetchEvent(location, city, name string, year int) (Event, error)
 	return match, nil
 }
 
-func (c client) FetchEventStatistics(e Event) (es tb.EventStatistics, err error) {
+func (c client) FetchEventStatistics(e Event) (es EventStatistics, err error) {
 	response, err := c.Request(fmt.Sprintf("%s", "/event/"+e.Key+"/oprs"))
 	if err != nil {
-		return tb.EventStatistics{}, err
+		return EventStatistics{}, err
 	}
-	es = tb.EventStatistics{}
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return
-	}
-	if err = json.Unmarshal(b, &es); err != nil {
+	es = EventStatistics{}
+	if err = bodyToJSON(response, &es); err != nil {
 		return es, err
 	}
 	return
 }
 
-func (c client) FetchTeamStatuses(e Event) (ts []tb.TeamEventStatus, err error) {
-
+func (c client) FetchTeamStatuses(e Event, team int) (ts []TeamEventStatus, err error) {
+	r, err := c.Request("/team/" + teamKey(team) + "/event/" + e.Key + "/status")
+	if err != nil {
+		return
+	}
+	ts = []TeamEventStatus{}
+	if err = bodyToJSON(r, &ts); err != nil {
+		return
+	}
+	fmt.Println(ts)
+	return
 }
 
 func teamKey(n int) string {
