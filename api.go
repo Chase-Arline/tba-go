@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Chase-Arline/tba/tbajson"
+	tb "github.com/Chase-Arline/tba/tbajson"
 )
 
 //Client represents an abstracted HTTP Client to pull from TBA API
@@ -115,12 +115,12 @@ func (c client) FetchEvent(location, city, name string, year int) (Event, error)
 	return match, nil
 }
 
-func (c client) FetchEventStatistics(e Event) (es tbajson.EventStatistics, err error) {
+func (c client) FetchEventStatistics(e Event) (es tb.EventStatistics, err error) {
 	response, err := c.Request(fmt.Sprintf("%s", "/event/"+e.Key+"/oprs"))
 	if err != nil {
-		return EventStatistics{}, err
+		return tb.EventStatistics{}, err
 	}
-	es = EventStatistics{}
+	es = tb.EventStatistics{}
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return
@@ -131,7 +131,7 @@ func (c client) FetchEventStatistics(e Event) (es tbajson.EventStatistics, err e
 	return
 }
 
-func (c client) FetchTeamStatuses(e Event) (ts []TeamEventStatus, err error) {
+func (c client) FetchTeamStatuses(e Event) (ts []tb.TeamEventStatus, err error) {
 
 }
 

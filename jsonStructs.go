@@ -1,4 +1,4 @@
-package tbajson
+package tba
 
 //EventStatistics holds the OPR, DPR, and CCWM information for each team at an event
 type EventStatistics struct {
