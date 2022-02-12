@@ -11,7 +11,7 @@ import (
 
 func main() {
 	client := new(tba.TBAClient)
-	event, err := client.FetchEvent("Auburn", "Mountainview", "Auburn Mountainview", 2019)
+	event, err := client.FetchEvent("Yakima", "Sundome", "Yakima Sundome", 2018)
 	errHandler(err)
 	matches, err := client.FetchMatches(event)
 	errHandler(err)
@@ -22,20 +22,20 @@ func main() {
 			qms = append(qms, match)
 		}
 	}
+	oprs, err := client.FetchEventStatistics(event)
+	errHandler(err)
+	fmt.Printf("3218 OPR: %v\n", oprs.OPRS["frc3218"])
 	fmt.Printf("QMs Length: %v\n", len(qms))
-	fmt.Println("Sorting Matches")
 	err = sortMatches(qms, true)
 	errHandler(err)
-	fmt.Println("Matches Sorted")
 	teamToCol, colToTeam, err := makeBiMap(qms)
-	fmt.Println(len(teamToCol))
-	for _, match := range qms {
-		fmt.Printf("Match #: %v\tRed: %v\t Blue: %v\n", match.Match_number, match.Alliances.Red.Score, match.Alliances.Blue.Score)
-	}
-
+	errHandler(err)
 	matrix, vector := createMatrix(qms, teamToCol, colToTeam)
-	err = solveMatrix(matrix, vector)
-
+	vec, err := solveMatrix(matrix, vector)
+	errHandler(err)
+	for team, col := range teamToCol {
+		fmt.Printf("Team: %v\tTBA: %v\t Vector: %v\n", team, oprs.OPRS[team], vec.AtVec(col))
+	}
 }
 
 func createMatrix(matches []tba.Match, teamToCol map[string]int, colToTeam map[int]string) (matrix *mat.Dense, vector *mat.VecDense) {
@@ -54,16 +54,12 @@ func createMatrix(matches []tba.Match, teamToCol map[string]int, colToTeam map[i
 	return
 }
 
-func solveMatrix(matrix *mat.Dense, vector *mat.VecDense) (err error) {
-	r, c := matrix.Dims()
-	resultVector := mat.NewVecDense(c, nil)
-	fmt.Printf("matrix R: %v\t C: %v\n", r, c)
-	fmt.Printf("ScoreVector: %v\n", vector.Len())
-	fmt.Printf("Result Vector: %v\n", resultVector.Len())
-	err = resultVector.SolveVec(matrix, vector)
+func solveMatrix(matrix *mat.Dense, vector *mat.VecDense) (vec *mat.VecDense, err error) {
+	_, c := matrix.Dims()
+	vec = mat.NewVecDense(c, nil)
+	err = vec.SolveVec(matrix, vector)
 	errHandler(err)
-	fmt.Println(resultVector.RawVector().Data)
-	return err
+	return
 }
 
 func makeBiMap(matches []tba.Match) (teamToCol map[string]int, colToTeam map[int]string, err error) {
@@ -72,7 +68,6 @@ func makeBiMap(matches []tba.Match) (teamToCol map[string]int, colToTeam map[int
 	teamToCol = make(map[string]int)
 	colToTeam = make(map[int]string)
 	var exists = struct{}{}
-	fmt.Println(len(matches))
 	for _, match := range matches {
 		for _, blueTeam := range match.Alliances.Blue.Team_keys {
 			if _, ok := teamSet[blueTeam]; !ok {
