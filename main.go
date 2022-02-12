@@ -28,9 +28,9 @@ func main() {
 	fmt.Printf("QMs Length: %v\n", len(qms))
 	err = sortMatches(qms, true)
 	errHandler(err)
-	teamToCol, colToTeam, err := makeBiMap(qms)
+	teamToCol, colToTeam, err := makeBiMap(qms[0:2])
 	errHandler(err)
-	matrix, vector := createMatrix(qms, teamToCol, colToTeam)
+	matrix, vector := createMatrix(qms[0:2], teamToCol, colToTeam)
 	vec, err := solveMatrix(matrix, vector)
 	errHandler(err)
 	for team, col := range teamToCol {
