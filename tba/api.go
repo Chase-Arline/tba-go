@@ -4,8 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
+
+	"gonum.org/v1/gonum/mat"
 )
 
 //Client represents an abstracted HTTP Client to pull from TBA API
@@ -138,4 +141,94 @@ func (c TBAClient) FetchTeamStatuses(e Event, team int) (ts []TeamEventStatus, e
 
 func teamKey(n int) string {
 	return fmt.Sprintf("%s%v", "frc", n)
+}
+
+func createMatrix(matches []Match, teamToCol map[string]int, colToTeam map[int]string) (matrix *mat.Dense, vector *mat.VecDense) {
+	matrix = mat.NewDense(2*len(matches), len(teamToCol), nil)
+	vector = mat.NewVecDense(2*len(matches), nil)
+	for i, match := range matches {
+		matrix.Set(i*2, teamToCol[match.Alliances.Blue.Team_keys[0]], 1)
+		matrix.Set(i*2, teamToCol[match.Alliances.Blue.Team_keys[1]], 1)
+		matrix.Set(i*2, teamToCol[match.Alliances.Blue.Team_keys[2]], 1)
+		matrix.Set(i*2+1, teamToCol[match.Alliances.Red.Team_keys[0]], 1)
+		matrix.Set(i*2+1, teamToCol[match.Alliances.Red.Team_keys[1]], 1)
+		matrix.Set(i*2+1, teamToCol[match.Alliances.Red.Team_keys[2]], 1)
+		vector.SetVec(i*2, float64(match.Alliances.Blue.Score))
+		vector.SetVec(i*2+1, float64(match.Alliances.Red.Score))
+	}
+	return
+}
+
+func solveMatrix(matrix *mat.Dense, vector *mat.VecDense) (vec *mat.VecDense, err error) {
+	_, c := matrix.Dims()
+	vec = mat.NewVecDense(c, nil)
+	err = vec.SolveVec(matrix, vector)
+	errHandler(err)
+	return
+}
+
+func makeBiMap(matches []Match) (teamToCol map[string]int, colToTeam map[int]string, err error) {
+	var teamNum int = 0
+	teamSet := make(map[string]struct{})
+	teamToCol = make(map[string]int)
+	colToTeam = make(map[int]string)
+	var exists = struct{}{}
+	for _, match := range matches {
+		for _, blueTeam := range match.Alliances.Blue.Team_keys {
+			if _, ok := teamSet[blueTeam]; !ok {
+				teamSet[blueTeam] = exists
+				teamToCol[blueTeam] = teamNum
+				colToTeam[teamNum] = blueTeam
+				teamNum++
+			}
+		}
+		for _, redTeam := range match.Alliances.Red.Team_keys {
+			if _, ok := teamSet[redTeam]; !ok {
+				teamSet[redTeam] = exists
+				teamToCol[redTeam] = teamNum
+				colToTeam[teamNum] = redTeam
+				teamNum++
+			}
+		}
+	}
+	return
+}
+
+func sortMatches(matches []Match) error {
+	matchLess := func(i, j int) bool {
+		return matches[i].Match_number < matches[j].Match_number
+	}
+	sort.SliceStable(matches, matchLess)
+	return nil
+}
+
+func (client *TBAClient) GetSortedQMs(event Event) []Match {
+	matches, err := client.FetchMatches(event)
+	errHandler(err)
+	qms := make([]Match, 0, len(matches))
+	for _, match := range matches {
+		if match.Comp_level == "qm" {
+			qms = append(qms, match)
+		}
+	}
+	err = sortMatches(qms)
+	errHandler(err)
+	return qms
+}
+
+func (client *TBAClient) GenerateOPRs(qms []Match) (map[string]float64, []string) {
+	oprs := make(map[string]float64)
+	teamToCol, colToTeam, err := makeBiMap(qms)
+	errHandler(err)
+	matrix, vector := createMatrix(qms, teamToCol, colToTeam)
+	vec, err := solveMatrix(matrix, vector)
+	errHandler(err)
+	teams := make([]string, len(teamToCol))
+	var i int = 0
+	for col, team := range colToTeam {
+		oprs[team] = vec.AtVec(col)
+		teams[i] = team
+		i++
+	}
+	return oprs, teams
 }
