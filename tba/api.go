@@ -213,7 +213,7 @@ func (client *TBAClient) GetSortedQMs(event Event) []Match {
 	}
 	err = sortMatches(qms)
 	errHandler(err)
-	return matches
+	return qms
 }
 
 func (client *TBAClient) GenerateOPRs(qms []Match) (map[string]float64, []string) {
