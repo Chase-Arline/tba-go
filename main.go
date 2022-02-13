@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -23,24 +24,28 @@ func main() {
 			allOPRs[team] = append(allOPRs[team], oprs[team]) //set each opr for each team up to this qualifcation match
 		}
 	}
-
 	var userInput string
 	for {
 		fmt.Println("What team would you like to see graphed? Example: 3218\nType 'quit' to end the program. ")
 		fmt.Scanf("%s", &userInput)
 		if userInput == "quit" {
 			break
+		} else if _, ok := allOPRs["frc"+userInput]; !ok {
+			fmt.Println("Input or team number not recognized. Was the team present in this competition: ", event.Name, "\nPlease try again\n")
+		} else { //do graphing
+			realMatchNumberOffset := len(qms) - len(allOPRs["frc"+userInput])
+			p := plot.New() //line that enables gonum plot import
+			line, err := tba.DrawStatLine(p, allOPRs["frc"+userInput], realMatchNumberOffset)
+			errHandler(err)
+			p.Add(line)
+			err = os.Mkdir("out", 0755)
+			if err != nil && !errors.Is(err, os.ErrExist) {
+				errHandler(err)
+			}
+			err = p.Save(1920, 1080, "out/"+event.Name+" "+userInput+".png")
+			errHandler(err)
+			fmt.Printf("Saved as: %v\n", "out/ "+event.Name+" "+userInput+".png")
 		}
-		realMatchNumberOffset := len(qms) - len(allOPRs["frc"+userInput])
-		p := plot.New() //line that enables gonum plot import
-		line, err := tba.DrawStatLine(p, allOPRs["frc"+userInput], realMatchNumberOffset)
-		errHandler(err)
-		p.Add(line)
-		err = os.Mkdir("out", 0755)
-		errHandler(err)
-		err = p.Save(1920, 1080, "out/"+event.Name+" "+userInput+".png")
-		errHandler(err)
-		fmt.Printf("Saved as: %v\n", "out/ "+event.Name+" "+userInput+".png")
 	}
 
 }

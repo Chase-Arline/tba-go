@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -263,10 +264,33 @@ func DrawStatLine(p *plot.Plot, oprs []float64, matchOffset int) (*plotter.Line,
 	p.Y.Tick.Label.Font.Size = vg.Points(35)
 	p.X.Label.Text = "Qualification Match #"
 	p.Y.Label.Text = "OPR"
+
+	numberOfMatches := len(oprs) + matchOffset
+
 	p.Y.Min = oprMin
 	p.Y.Max = oprMax
 	p.X.Min = 0
-	p.X.Max = float64(len(oprs))
+	p.X.Max = float64(numberOfMatches)
+	var xTicks plot.TickerFunc
+	xTicks = func(min float64, max float64) []plot.Tick {
+		ticks := make([]plot.Tick, numberOfMatches/4+2) // --> number of matches /4 +2 for padding # of ticks on x axis
+		for i := 0; i < numberOfMatches/4+2; i++ {
+			ticks[i] = plot.Tick{Value: float64(i * 4), Label: strconv.Itoa(i * 4)}
+		}
+		return ticks
+	}
+	p.X.Tick.Marker = xTicks
+	var yTicks plot.TickerFunc
+	yTicks = func(min float64, max float64) []plot.Tick {
+		ticks := make([]plot.Tick, (numberOfMatches/4 + 2))
+		for i := 0; i < numberOfMatches/4+2; i++ { //--> same number of data points as x axis
+			oprDataPoint := min + float64(i)/(float64(numberOfMatches/4+2))*(max-min) //start at min, add (max-min) linearly
+			ticks[i] = plot.Tick{Value: oprDataPoint, Label: strconv.Itoa(int(oprDataPoint))}
+		}
+		return ticks
+	}
+	p.Y.Tick.Marker = yTicks
+
 	p.Add(plotter.NewGrid())
 
 	return plotter.NewLine(lineChart)
