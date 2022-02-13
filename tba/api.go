@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"gonum.org/v1/gonum/mat"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
 )
 
 //Client represents an abstracted HTTP Client to pull from TBA API
@@ -231,4 +234,40 @@ func (client *TBAClient) GenerateOPRs(qms []Match) (map[string]float64, []string
 		i++
 	}
 	return oprs, teams
+}
+
+func DrawStatLine(p *plot.Plot, oprs []float64, matchOffset int) (*plotter.Line, error) {
+	var oprMin, oprMax float64
+	oprMin = 100000000 //unrealistic opr
+	oprMax = 0         //very low opr
+	lineChart := plotter.Line{}
+	points := make([]plotter.XY, len(oprs))
+	plotter.DefaultLineStyle.Width = vg.Points(2.5)
+	plotter.DefaultGlyphStyle.Radius = vg.Points(3)
+	plotter.DefaultFontSize = vg.Points(10)
+	for i, opr := range oprs {
+		if opr > oprMax {
+			oprMax = opr
+		}
+		if opr < oprMin {
+			oprMin = opr
+		}
+		points[i] = plotter.XY{X: float64(i + matchOffset), Y: opr}
+	}
+	oprMax += 10
+	oprMin -= 5
+	lineChart.XYs = points
+	p.X.Label.TextStyle.Font.Size = vg.Points(50)
+	p.Y.Label.TextStyle.Font.Size = vg.Points(50)
+	p.X.Tick.Label.Font.Size = vg.Points(35)
+	p.Y.Tick.Label.Font.Size = vg.Points(35)
+	p.X.Label.Text = "Qualification Match #"
+	p.Y.Label.Text = "OPR"
+	p.Y.Min = oprMin
+	p.Y.Max = oprMax
+	p.X.Min = 0
+	p.X.Max = float64(len(oprs))
+	p.Add(plotter.NewGrid())
+
+	return plotter.NewLine(lineChart)
 }
