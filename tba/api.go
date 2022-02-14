@@ -68,6 +68,8 @@ type Event struct {
 //ErrEventNotFound is returned when keywords are not able to match to an event or an event code is not available on TBA
 var ErrEventNotFound error = errors.New("event could not be found")
 
+var SINGULAR_OPR float64 = -10000
+
 //FetchEvent returns the string key representation of an frc event
 //examples of keywords are city, event name, location name, short name of the event, ~ Auburn, Auburn Mountainview, PNW
 func (c TBAClient) FetchEvent(location, city, name string, year int) (Event, error) {
@@ -163,11 +165,11 @@ func createMatrix(matches []Match, teamToCol map[string]int, colToTeam map[int]s
 	return
 }
 
+//still has issues solving some matrices because of singularity issues, not sure how to fix it atm other than just ignoring it
 func solveMatrix(matrix *mat.Dense, vector *mat.VecDense) (vec *mat.VecDense, err error) {
 	_, c := matrix.Dims()
 	vec = mat.NewVecDense(c, nil)
 	err = vec.SolveVec(matrix, vector)
-	errHandler(err)
 	return
 }
 
@@ -220,21 +222,29 @@ func (client *TBAClient) GetSortedQMs(event Event) []Match {
 	return qms
 }
 
-func (client *TBAClient) GenerateOPRs(qms []Match) (map[string]float64, []string) {
+func (client *TBAClient) GenerateOPRs(qms []Match) (map[string]float64, []string, error) {
 	oprs := make(map[string]float64)
 	teamToCol, colToTeam, err := makeBiMap(qms)
-	errHandler(err)
+	if err != nil {
+		return oprs, nil, err
+	}
 	matrix, vector := createMatrix(qms, teamToCol, colToTeam)
-	vec, err := solveMatrix(matrix, vector)
-	errHandler(err)
 	teams := make([]string, len(teamToCol))
 	var i int = 0
-	for col, team := range colToTeam {
-		oprs[team] = vec.AtVec(col)
+	for _, team := range colToTeam {
 		teams[i] = team
 		i++
 	}
-	return oprs, teams
+	vec, err := solveMatrix(matrix, vector)
+	if err != nil {
+		return oprs, teams, err
+	}
+	i = 0
+	for col, team := range colToTeam {
+		oprs[team] = vec.AtVec(col)
+		i++
+	}
+	return oprs, teams, err
 }
 
 func DrawStatLine(p *plot.Plot, oprs []float64, matchOffset int) (*plotter.Line, error) {
@@ -242,19 +252,26 @@ func DrawStatLine(p *plot.Plot, oprs []float64, matchOffset int) (*plotter.Line,
 	oprMin = 100000000 //unrealistic opr
 	oprMax = 0         //very low opr
 	lineChart := plotter.Line{}
-	points := make([]plotter.XY, len(oprs))
+
+	var points []plotter.XY
 	plotter.DefaultLineStyle.Width = vg.Points(2.5)
 	plotter.DefaultGlyphStyle.Radius = vg.Points(3)
 	plotter.DefaultFontSize = vg.Points(10)
+	var singularOPRCount int = 0
 	for i, opr := range oprs {
-		if opr > oprMax {
-			oprMax = opr
+		if opr != SINGULAR_OPR { //only use non singular matrix oprs
+			if opr > oprMax {
+				oprMax = opr
+			}
+			if opr < oprMin {
+				oprMin = opr
+			}
+			points = append(points, plotter.XY{X: float64(i + matchOffset + singularOPRCount), Y: opr})
+		} else {
+			singularOPRCount++
 		}
-		if opr < oprMin {
-			oprMin = opr
-		}
-		points[i] = plotter.XY{X: float64(i + matchOffset), Y: opr}
 	}
+
 	oprMax += 10
 	oprMin -= 5
 	lineChart.XYs = points
